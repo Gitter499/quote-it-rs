@@ -1,0 +1,13 @@
+[package]
+name = "quote-it"
+version = "0.1.0"
+author = "Rafayel Amirkhanyan"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+chrono = { version = "0.4.38", features = ["serde"] }
+clap = { version = "4.5.11", features = ["derive"] }
+homedir = "0.3.3"
+polodb_core = "4.4.2"
+serde = { version = "1.0.204", features = ["derive"] }
