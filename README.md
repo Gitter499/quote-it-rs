@@ -1,6 +1,6 @@
 # Quote It
 
-A simple Rust CLI quoting utility inspired by [Quote It]("https://github.com/mattperls-code-apps/quote-it-app")
+A simple Rust CLI quoting utility inspired by [Quote It](https://github.com/mattperls-code-apps/quote-it-app)
 
 ## Installation
 
