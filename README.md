@@ -6,6 +6,12 @@ A simple Rust CLI quoting utility inspired by [Quote It](https://github.com/matt
 
 Ensure `cargo` is installed
 
+### Install with crates.io
+
+`cargo install quote-it`
+
+### Install manually
+
 Clone this repo
 
 Run `cargo install --path . ` 
