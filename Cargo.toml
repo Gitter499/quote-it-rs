@@ -5,7 +5,6 @@ authors = ["Rafayel Amirkhanyan <rafayel.amirkhanyan@gmail.com>"]
 description = "A quoting utility in the terminal"
 readme = "README.md"
 repository = "https://github.com/Gitter499/quote-it-rs"
-license = "MIT"
 license-file = "LICENSE"
 keywords = ["CLI", "Quotes", "Fun"]
 categories = ["command-line-utilities"]
