@@ -19,10 +19,8 @@ homedir = "0.3.3"
 polodb_core = "4.4.2"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_with = "3.9.0"
-
-[profile.release]
-strip = true
-opt-level = "z"
-lto = true
+# strip = true
+# opt-level = "z"
+# lto = true
 # panic = "abort"
-codegen-units = 1
+# codegen-units = 1
