@@ -12,15 +12,17 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.86"
+bson = { version = "2.11.0", features = ["chrono-0_4", "serde_with"] }
 chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5.11", features = ["derive"] }
 homedir = "0.3.3"
 polodb_core = "4.4.2"
 serde = { version = "1.0.204", features = ["derive"] }
+serde_with = "3.9.0"
 
 [profile.release]
 strip = true
 opt-level = "z"
 lto = true
-panic = "abort"
+# panic = "abort"
 codegen-units = 1

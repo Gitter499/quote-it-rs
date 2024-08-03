@@ -1,5 +1,5 @@
 use anyhow::{Context, Ok};
-use chrono::Local;
+use chrono::{Local, NaiveDateTime, Timelike};
 use clap::{ArgAction, Parser, Subcommand};
 use homedir::my_home;
 use polodb_core::bson::*;
@@ -20,9 +20,9 @@ pub struct CLI {
     /// Specify an author
     #[arg(short, long)]
     pub author: Option<String>,
-    /// Add a timestamp
+    /// Add a date
     #[arg(short, long,action=ArgAction::SetTrue)]
-    pub timestamp: bool,
+    pub date: bool,
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -34,14 +34,24 @@ pub enum Commands {
         /// Lists quotes made by specified author
         #[arg(long, short)]
         author: Option<String>,
+        /// List quotes by date (make sure to provide date in the following format: mm-dd-yyyy)
+        #[arg(long, short, value_parser = parse_date)]
+        date: Option<DateTime>,
     },
+}
+
+fn parse_date(arg: &str) -> anyhow::Result<DateTime> {
+    let naive_date_time =
+        NaiveDateTime::parse_from_str(&format!("{}T0:00:00", arg), "%m-%d-%YT%H:%M:%S")?;
+    Ok(DateTime::from_chrono(naive_date_time.and_utc()))
 }
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Quote {
     quote: String,
     author: Option<String>,
-    date: Option<chrono::DateTime<Local>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    date: Option<DateTime>,
 }
 
 impl Display for Quote {
@@ -52,7 +62,11 @@ impl Display for Quote {
         };
 
         if let Some(quote_timestamp) = self.date.as_ref() {
-            quote_string.push_str(&format!(" on {}", quote_timestamp.format("%m-%d-%Y")))
+            // Due to serde limitations with chrono timezones, we must convert the time during print, although it is stored
+            // as utc in the db. We must do this conversion for import/export as well
+            let converted_date: chrono::DateTime<Local> =
+                chrono::DateTime::from(quote_timestamp.to_chrono());
+            quote_string.push_str(&format!(" on {}", converted_date.format("%m-%d-%Y")))
         };
         quote_string.push_str("\n------------");
 
@@ -70,22 +84,55 @@ fn main() -> anyhow::Result<()> {
 
     let quotes: Collection<Quote> = db.collection("quotes");
 
-    match args.command {
-        Some(c) => match c {
-            Commands::List { author } => {
-                for quote in quotes.find(if author.is_some() {
-                    Some(doc! {
-                        "author": author
+    if let Some(c) = args.command {
+        match c {
+            Commands::List { author, date } => {
+                let found_quotes = if author.is_some() && date.is_some() {
+                    quotes.find(doc! {
+                        "author": author.as_ref().unwrap(),
+                        "date": { "$lte": &date }
+                    })
+                } else if author.is_some() {
+                    quotes.find(doc! {
+                        "author": author.as_ref().unwrap()
+                    })
+                } else if date.is_some() {
+                    quotes.find(doc! {
+                        "date": {
+                            "$lte": &date
+                        }
                     })
                 } else {
-                    None
-                })? {
-                    println!("\n{}", quote?);
+                    quotes.find(None)
+                };
+                // Very jank way of doing this but iterators leave me no choice
+                let mut i = 0;
+                for quote in found_quotes? {
+                    i += 1;
+                    println!("{}", quote?)
+                }
+
+                if i == 0 {
+                    let mut message = String::from("No quotes found");
+                    let formatted_date = date.as_ref().map(|d| d.to_chrono().format("%m-%d-%Y"));
+                    if author.is_some() && date.is_some() {
+                        message.push_str(&format!(
+                            " by {} on {}",
+                            author.as_ref().unwrap(),
+                            formatted_date.as_ref().unwrap()
+                        ));
+                    } else if author.is_some() {
+                        message.push_str(&format!(" by {}", author.as_ref().unwrap()));
+                    } else if date.is_some() {
+                        message.push_str(&format!(" on {}", formatted_date.as_ref().unwrap()));
+                    } else {
+                        message.push_str(". Try creating a quote with `quote-it <QUOTE>`")
+                    }
+                    println!("{}", message);
                 }
             }
-        },
-        None => {}
-    }
+        }
+    };
 
     if let Some(quote_content) = args.quote {
         let mut new_quote = Quote::default();
@@ -95,8 +142,23 @@ fn main() -> anyhow::Result<()> {
             new_quote.author = Some(author);
         }
 
-        if args.timestamp {
-            new_quote.date = Some(chrono::Local::now());
+        if args.date {
+            // Yes this solution is jank, so is everything in this repo to do with dates/time
+            // I am thinking of converting to use plain milliseconds since unix epoch but right now this works
+            let local = Local::now().naive_local();
+            let date_zeroed_time = local
+                .with_hour(0)
+                .unwrap()
+                .with_minute(0)
+                .unwrap()
+                .with_second(0)
+                .unwrap()
+                .with_nanosecond(0)
+                .unwrap()
+                .and_utc();
+
+            let bson_date = DateTime::from_chrono(date_zeroed_time);
+            new_quote.date = Some(bson_date);
         }
         quotes.insert_one(new_quote)?;
     }
